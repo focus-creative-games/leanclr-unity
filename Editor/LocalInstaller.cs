@@ -28,10 +28,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using UnityEditor;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace LeanCLR
 {
@@ -79,6 +82,74 @@ namespace LeanCLR
         public bool HasInstalledToLocal()
         {
             return Directory.Exists(Settings.LocalLibil2cppPath);
+        }
+
+        public bool NeedReinstallAfterUpdatePackage()
+        {
+            if (!HasInstalledToLocal())
+            {
+                return false;
+            }
+            long currentTicks = ComputePackageLatestFileWriteTimeUtcTicks();
+            if (currentTicks == 0L)
+            {
+                return true;
+            }
+            string fingerprintPath = InstalledPackageFingerprintPath;
+            if (!File.Exists(fingerprintPath))
+            {
+                return true;
+            }
+            string savedText = File.ReadAllText(fingerprintPath, Encoding.UTF8).Trim();
+            if (!long.TryParse(savedText, out long savedTicks))
+            {
+                return true;
+            }
+            return currentTicks != savedTicks;
+        }
+
+        private static string InstalledPackageFingerprintPath =>
+            Path.Combine(Settings.InstallRootDir, "installed_package_max_mtime_utc_ticks.txt");
+
+        private static string GetLeanClrPackageRootPath()
+        {
+            var packageInfo = PackageInfo.FindForAssembly(typeof(LocalInstaller).Assembly);
+            if (!string.IsNullOrEmpty(packageInfo?.resolvedPath))
+            {
+                return packageInfo.resolvedPath;
+            }
+            return Path.GetFullPath(Path.Combine("Packages", Settings.PackageName));
+        }
+
+        private static long ComputePackageLatestFileWriteTimeUtcTicks()
+        {
+            string root = GetLeanClrPackageRootPath();
+            if (!Directory.Exists(root))
+            {
+                return 0L;
+            }
+            long maxTicks = 0L;
+            foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+            {
+                long ticks = File.GetLastWriteTimeUtc(file).Ticks;
+                if (ticks > maxTicks)
+                {
+                    maxTicks = ticks;
+                }
+            }
+            return maxTicks;
+        }
+
+        private static void WriteInstalledPackageFingerprint()
+        {
+            long ticks = ComputePackageLatestFileWriteTimeUtcTicks();
+            if (ticks == 0L)
+            {
+                return;
+            }
+            string path = InstalledPackageFingerprintPath;
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, ticks.ToString(), Encoding.UTF8);
         }
 
         private static string AddExeSuffix(string path)
@@ -138,6 +209,7 @@ namespace LeanCLR
             BashUtil.RemoveDir($"Library/Bee", true);
             if (HasInstalledToLocal())
             {
+                WriteInstalledPackageFingerprint();
                 Debug.Log("Install Sucessfully");
             }
             else

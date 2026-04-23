@@ -41,7 +41,12 @@ namespace LeanCLR.BuildProcessors
                 Debug.LogWarning($"[CheckSettings] LeanCLR is not installed, start install LeanCLR..");
                 installerController.InstallLocal();
             }
-            if (!installerController.HasInstalledToLocal())
+            if (installerController.NeedReinstallAfterUpdatePackage())
+            {
+                Debug.LogWarning($"[CheckSettings] LeanCLR package updated, start reinstall LeanCLR..");
+                installerController.InstallLocal();
+            }
+            if (!installerController.HasInstalledToLocal() || installerController.NeedReinstallAfterUpdatePackage())
             {
                 throw new Exception($"[CheckSettings] Failed to install LeanCLR, please check the log for details.");
             }
