@@ -50,12 +50,6 @@ namespace LeanCLR
                 installer.InstallLocal();
             }
         }
-
-        [MenuItem("LeanCLR/UpdateUnityVersion", priority = 101)]
-        public static void UpdateUnityVersion()
-        {
-            UpdateUnityVersionMacrosInCpp.UpdateUnityVersion();
-        }
     }
 
 }
