@@ -92,7 +92,44 @@ namespace LeanCLR.BuildProcessors
                 }
             }
 
+            AppendLazyLoadAssemblyExcludeArgs(sb, Settings.Instance.lazyLoadAssemblyNames);
+
             return sb.ToString();
+        }
+
+        private static void AppendLazyLoadAssemblyExcludeArgs(StringBuilder sb, string[] lazyLoadAssemblyNames)
+        {
+            if (lazyLoadAssemblyNames == null)
+            {
+                return;
+            }
+
+            foreach (string raw in lazyLoadAssemblyNames)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+
+                string name = raw.Trim();
+                if (name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    name = name.Substring(0, name.Length - 4);
+                }
+
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                if (sb.Length > 0)
+                {
+                    sb.Append(' ');
+                }
+
+                sb.Append("--leanaot-exclude-assembly-from-global-metadata=");
+                sb.Append(name);
+            }
         }
 
         private static void AppendRuleFileArgument(StringBuilder sb, string absolutePath)

@@ -42,6 +42,9 @@ namespace LeanCLR
         [Tooltip("LeanAOT Settings")]
         public LeanAOTSettings leanAOTSettings;
 
+        [Tooltip("Lazy loaded assemblies not be added to global-metadata.dat at build time. You have to load them manually by Assembly.Load(byte[]) in runtime.")]
+        public string[] lazyLoadAssemblyNames;
+
         private static Settings s_Instance;
 
         public static Settings Instance
