@@ -94,6 +94,4 @@
     <type fullname="System.Globalization.CalendarData" preserve="fields" />
     <type fullname="System.Diagnostics.StackFrame" preserve="fields" />
   </assembly>
-  <assembly fullname="UnityEngine.CoreModule" preserve="all" />
-  <assembly fullname="UnityEngine.AnimationModule" preserve="all" />
 </linker>
