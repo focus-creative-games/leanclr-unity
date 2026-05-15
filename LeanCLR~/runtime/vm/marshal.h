@@ -60,13 +60,13 @@ class Marshal
 
     static RtResultVoid ptr_to_structure(void* ptr, vm::RtObject* obj);
     static RtResult<vm::RtObject*> ptr_to_structure_type(void* ptr, vm::RtReflectionType* ref_type);
-    static RtResultVoid structure_to_ptr(vm::RtObject* obj, void* ptr, int32_t delete_old);
+    static RtResultVoid structure_to_ptr(vm::RtObject* obj, void* ptr, bool delete_old);
     static RtResultVoid destroy_structure(void* ptr, vm::RtReflectionType* ref_type);
 
     static RtResult<int32_t> sizeof_type(vm::RtReflectionType* ref_type);
     static RtResult<intptr_t> offset_of(vm::RtReflectionType* ref_type, const char* field_name);
 
-    static RtResult<RtDelegate*> marshal_function_pointer_to_delegate(void* ptr, metadata::RtClass* delegate_class);
+    static RtResult<RtDelegate*> marshal_function_pointer_to_delegate(metadata::RtNativeMethodPointer ptr, metadata::RtClass* delegate_class);
     static RtResult<metadata::RtNativeMethodPointer> get_function_pointer_for_delegate(RtDelegate* delegate);
 
     static int32_t get_last_win32_error();

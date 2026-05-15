@@ -128,6 +128,9 @@ class StringBuilder
         return *this;
     }
 
+    StringBuilder& append_ansi_to_utf16_str(const NativeChar* ansi_str, size_t ansi_len);
+    StringBuilder& append_utf16_to_ansi_str(const Utf16Char* utf16_str, size_t utf16_len);
+
     // Append uint16 as decimal string
     StringBuilder& append_u16(uint16_t value)
     {
@@ -198,11 +201,46 @@ class StringBuilder
         return _buf;
     }
 
+    NativeChar* as_ansi_chars() const
+    {
+        return reinterpret_cast<NativeChar*>(_buf);
+    }
+
+    Utf16Char* as_utf16chars() const
+    {
+        return reinterpret_cast<Utf16Char*>(_buf);
+    }
+
+    size_t get_ansi_chars_length() const
+    {
+        // Windows: _buf holds CP_ACP multibyte octets; POSIX: UTF-8 octets. _length is always a byte count.
+        return _length;
+    }
+
+    size_t get_utf16chars_length() const
+    {
+        return _length / sizeof(Utf16Char);
+    }
+
     // Ensure null terminator without appending to length
     void sure_null_terminator_but_not_append()
     {
         reserve(1);
         _buf[_length] = 0;
+    }
+
+    void sure_ansi_null_terminator_but_not_append()
+    {
+        reserve(1);
+        _buf[_length] = 0;
+    }
+
+    void sure_utf16_null_terminator_but_not_append()
+    {
+        reserve(2);
+        assert(_length % 2 == 0);
+        _buf[_length] = 0;
+        _buf[_length + 1] = 0;
     }
 
     // Duplicate to zero-ended C string
@@ -217,6 +255,40 @@ class StringBuilder
         }
         result[_length] = 0;
 
+        return result;
+    }
+
+    NativeChar* dup_to_zero_end_ansi_chars() const
+    {
+#if LEANCLR_PLATFORM_WIN
+        char* bytes = static_cast<char*>(alloc::GeneralAllocation::malloc(_length + 1));
+        if (_length > 0)
+        {
+            std::memcpy(bytes, _buf, _length);
+        }
+        bytes[_length] = 0;
+        return reinterpret_cast<NativeChar*>(bytes);
+#else
+        NativeChar* result = static_cast<NativeChar*>(alloc::GeneralAllocation::calloc(_length + 1, sizeof(NativeChar)));
+        if (_length > 0)
+        {
+            std::memcpy(result, _buf, _length);
+        }
+        result[_length] = 0;
+        return result;
+#endif
+    }
+
+    Utf16Char* dup_to_zero_end_utf16chars() const
+    {
+        assert(_length % 2 == 0);
+        Utf16Char* result = static_cast<Utf16Char*>(alloc::GeneralAllocation::calloc(_length / 2 + 1, sizeof(Utf16Char)));
+        if (_length > 0)
+        {
+            std::memcpy(result, _buf, _length);
+        }
+        result[_length] = 0;
+        result[_length + 1] = 0;
         return result;
     }
 

@@ -200,7 +200,7 @@ RtResult<vm::RtObject*> SystemRuntimeInteropServicesMarshal::ptr_to_structure_ty
     return vm::Marshal::ptr_to_structure_type(ptr, ref_type);
 }
 
-RtResultVoid SystemRuntimeInteropServicesMarshal::structure_to_ptr(vm::RtObject* obj, void* ptr, int32_t delete_old) noexcept
+RtResultVoid SystemRuntimeInteropServicesMarshal::structure_to_ptr(vm::RtObject* obj, void* ptr, bool delete_old) noexcept
 {
     if (!obj || !ptr)
     {
@@ -279,7 +279,7 @@ RtResultVoid SystemRuntimeInteropServicesMarshal::copy_from_unmanaged_fixed(void
 RtResult<vm::RtDelegate*> SystemRuntimeInteropServicesMarshal::get_delegate_for_function_pointer_internal(void* ptr, vm::RtReflectionType* ref_type) noexcept
 {
     DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(metadata::RtClass*, klass, vm::Class::get_class_from_typesig(ref_type->type_handle));
-    return vm::Marshal::marshal_function_pointer_to_delegate(ptr, klass);
+    return vm::Marshal::marshal_function_pointer_to_delegate(reinterpret_cast<metadata::RtNativeMethodPointer>(ptr), klass);
 }
 
 RtResult<void*> SystemRuntimeInteropServicesMarshal::get_function_pointer_for_delegate_internal(vm::RtDelegate* delegate) noexcept
@@ -564,7 +564,7 @@ static RtResultVoid structure_to_ptr_invoker(metadata::RtManagedMethodPointer, c
 {
     vm::RtObject* obj = EvalStackOp::get_param<vm::RtObject*>(params, 0);
     void* ptr = EvalStackOp::get_param<void*>(params, 1);
-    int32_t delete_old = EvalStackOp::get_param<int32_t>(params, 2);
+    bool delete_old = EvalStackOp::get_param<bool>(params, 2);
     return SystemRuntimeInteropServicesMarshal::structure_to_ptr(obj, ptr, delete_old);
 }
 
