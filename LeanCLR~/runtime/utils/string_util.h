@@ -16,8 +16,6 @@ namespace utils
     std::memcpy(local_temp_str, str, static_cast<size_t>(str_len));         \
     local_temp_str[static_cast<size_t>(str_len)] = '\0';
 
-class StringBuilder;
-
 class StringUtil
 {
   public:
@@ -58,15 +56,10 @@ class StringUtil
 
     static int32_t get_utf16chars_length(const Utf16Char* chars)
     {
-        int32_t length = 0;
-        while (chars[length] != 0)
-        {
-            ++length;
-        }
-        return length;
+        // Utf16Char is uint16_t; libc++ only specializes char_traits for char16_t, not uint16_t.
+        return static_cast<int32_t>(
+            std::char_traits<char16_t>::length(reinterpret_cast<const char16_t*>(chars)));
     }
-
-    static void utf16_to_utf8(const Utf16Char* utf16_str, size_t utf16_len, StringBuilder& out_utf8_str);
 };
 
 struct CStrCompare

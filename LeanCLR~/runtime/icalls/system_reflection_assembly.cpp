@@ -47,13 +47,11 @@ RtResult<vm::RtReflectionType*> SystemReflectionAssembly::internal_get_type(vm::
                                                                             vm::RtString* name, bool throw_on_error, bool ignore_case) noexcept
 {
     (void)module; // unused
-    utils::StringBuilder name_buf;
-    utils::StringUtil::utf16_to_utf8(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)), name_buf);
-    name_buf.sure_null_terminator_but_not_append();
+    utils::Utf8StringBuilder name_buf(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)));
 
     DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(
         const metadata::RtTypeSig*, resolved_type_sig,
-        vm::Type::resolve_assembly_qualified_name(assembly->assembly->mod, name_buf.as_cstr(), name_buf.length(), ignore_case));
+        vm::Type::resolve_assembly_qualified_name(assembly->assembly->mod, name_buf.get_const_chars(), name_buf.length(), ignore_case));
     if (resolved_type_sig == nullptr)
     {
         if (throw_on_error)
@@ -74,7 +72,9 @@ RtResult<vm::RtArray*> SystemReflectionAssembly::get_types(vm::RtReflectionAssem
 RtResult<vm::RtReflectionAssembly*> SystemReflectionAssembly::get_entry_assembly() noexcept
 {
     // Find assembly with entrypoint
-    for (metadata::RtModuleDef* mod : metadata::RtModuleDef::get_registered_modules())
+    utils::Vector<metadata::RtModuleDef*> modules;
+    metadata::RtModuleDef::get_registered_modules(modules);
+    for (metadata::RtModuleDef* mod : modules)
     {
         metadata::EncodedTokenId entry_token = mod->get_entrypoint_token();
         if (entry_token != 0)
@@ -95,32 +95,28 @@ RtResultVoid SystemReflectionAssembly::internal_get_assembly_name(vm::RtString* 
 
 RtResult<vm::RtReflectionAssembly*> SystemReflectionAssembly::load_from(vm::RtString* path, bool ref_only, int32_t* mark) noexcept
 {
-    utils::StringBuilder name_buf;
-    utils::StringUtil::utf16_to_utf8(vm::String::get_chars_ptr(path), static_cast<size_t>(vm::String::get_length(path)), name_buf);
+    utils::Utf8StringBuilder name_buf(vm::String::get_chars_ptr(path), static_cast<size_t>(vm::String::get_length(path)));
     vm::RtAppDomain* current_app_domain = vm::AppDomain::get_default_appdomain();
     DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(
-        metadata::RtAssembly*, loaded_ass, vm::Assembly::load_by_name(current_app_domain, name_buf.as_cstr(), nullptr, ref_only, *(vm::RtStackCrawlMark*)mark));
+        metadata::RtAssembly*, loaded_ass, vm::Assembly::load_by_name(current_app_domain, name_buf.get_const_chars(), nullptr, ref_only, *(vm::RtStackCrawlMark*)mark));
     return vm::Reflection::get_assembly_reflection_object(loaded_ass);
 }
 
 RtResult<vm::RtReflectionAssembly*> SystemReflectionAssembly::load_file_internal(vm::RtString* path, int32_t* mark) noexcept
 {
     (void)mark;
-    utils::StringBuilder name_buf;
-    utils::StringUtil::utf16_to_utf8(vm::String::get_chars_ptr(path), static_cast<size_t>(vm::String::get_length(path)), name_buf);
+    utils::Utf8StringBuilder name_buf(vm::String::get_chars_ptr(path), static_cast<size_t>(vm::String::get_length(path)));
 
-    DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(metadata::RtAssembly*, loaded_ass, vm::Assembly::load_by_name(name_buf.as_cstr()));
+    DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(metadata::RtAssembly*, loaded_ass, vm::Assembly::load_by_name(name_buf.get_const_chars()));
     return vm::Reflection::get_assembly_reflection_object(loaded_ass);
 }
 
 RtResult<vm::RtReflectionAssembly*> SystemReflectionAssembly::load_with_partial_name(vm::RtString* name, vm::RtObject* evidence) noexcept
 {
     (void)evidence;
-    utils::StringBuilder name_buf;
-    utils::StringUtil::utf16_to_utf8(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)), name_buf);
-    name_buf.sure_null_terminator_but_not_append();
+    utils::Utf8StringBuilder name_buf(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)));
 
-    DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(metadata::RtAssembly*, loaded_ass, vm::Assembly::load_by_name(name_buf.as_cstr()));
+    DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(metadata::RtAssembly*, loaded_ass, vm::Assembly::load_by_name(name_buf.get_const_chars()));
     return vm::Reflection::get_assembly_reflection_object(loaded_ass);
 }
 

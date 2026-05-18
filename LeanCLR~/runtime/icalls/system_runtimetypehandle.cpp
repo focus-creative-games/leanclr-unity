@@ -255,8 +255,7 @@ RtResult<vm::RtReflectionModule*> SystemRuntimeTypeHandle::get_module(const vm::
 RtResult<vm::RtReflectionType*> SystemRuntimeTypeHandle::internal_from_name(vm::RtString* name, int32_t* stack_crawl_mark, vm::RtReflectionAssembly* assembly,
                                                                             bool throw_on_error, bool ignore_case, bool reflection_only) noexcept
 {
-    utils::StringBuilder name_buf;
-    utils::StringUtil::utf16_to_utf8(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)), name_buf);
+    utils::Utf8StringBuilder name_buf(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)));
     metadata::RtModuleDef* default_mod = nullptr;
     if (assembly)
     {
@@ -274,7 +273,7 @@ RtResult<vm::RtReflectionType*> SystemRuntimeTypeHandle::internal_from_name(vm::
             default_mod = vm::Assembly::get_corlib()->mod;
         }
     }
-    auto ret_typesig = vm::Type::parse_assembly_qualified_type(default_mod, name_buf.as_cstr(), name_buf.length(), ignore_case);
+    auto ret_typesig = vm::Type::parse_assembly_qualified_type(default_mod, name_buf.get_const_chars(), name_buf.length(), ignore_case);
     if (ret_typesig.is_err())
     {
         if (throw_on_error)

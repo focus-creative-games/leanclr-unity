@@ -75,9 +75,9 @@ static RtResultVoid get_location_invoker(metadata::RtManagedMethodPointer, const
 RtResult<vm::RtString*> SystemReflectionRuntimeAssembly::get_fullname(vm::RtReflectionAssembly* ref_ass) noexcept
 {
     metadata::RtModuleDef* mod = ref_ass->assembly->mod;
-    utils::StringBuilder sb;
+    utils::Utf8StringBuilder sb;
     vm::Type::append_assembly_name(sb, mod->get_assembly_name());
-    RET_OK(vm::String::create_string_from_utf8chars(sb.as_cstr(), static_cast<int32_t>(sb.length())));
+    RET_OK(vm::String::create_string_from_utf8chars(sb.get_const_chars(), static_cast<int32_t>(sb.length())));
 }
 
 /// @icall: System.Reflection.RuntimeAssembly::get_fullname(System.Reflection.Assembly)

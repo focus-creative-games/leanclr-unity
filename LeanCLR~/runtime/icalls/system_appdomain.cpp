@@ -97,7 +97,8 @@ static RtResultVoid execute_assembly_invoker(metadata::RtManagedMethodPointer, c
 
 RtResult<vm::RtArray*> SystemAppDomain::get_assemblies(vm::RtAppDomain* this_domain, bool ref_only) noexcept
 {
-    utils::Span<metadata::RtModuleDef*> mods = vm::AppDomain::get_modules(this_domain);
+    utils::Vector<metadata::RtModuleDef*> mods;
+    vm::AppDomain::get_modules(this_domain, mods);
     metadata::RtClass* cls_assembly = vm::Class::get_corlib_types().cls_reflection_assembly;
     DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(vm::RtArray*, ass_arr, vm::Array::new_szarray_from_ele_klass(cls_assembly, static_cast<int32_t>(mods.size())));
     for (size_t i = 0; i < mods.size(); ++i)
@@ -159,10 +160,9 @@ static RtResultVoid set_data_invoker(metadata::RtManagedMethodPointer, const met
 RtResult<vm::RtReflectionAssembly*> SystemAppDomain::load_assembly(vm::RtAppDomain* this_domain, vm::RtString* name, vm::RtObject* evidence, bool ref_only,
                                                                    vm::RtStackCrawlMark* stack_crawl_mark) noexcept
 {
-    utils::StringBuilder name_buf;
-    utils::StringUtil::utf16_to_utf8(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)), name_buf);
+    utils::Utf8StringBuilder name_buf(vm::String::get_chars_ptr(name), static_cast<size_t>(vm::String::get_length(name)));
     DECLARING_AND_UNWRAP_OR_RET_ERR_ON_FAIL(metadata::RtAssembly*, loaded_ass,
-                                            vm::Assembly::load_by_name(this_domain, name_buf.as_cstr(), evidence, ref_only, *stack_crawl_mark));
+                                            vm::Assembly::load_by_name(this_domain, name_buf.get_const_chars(), evidence, ref_only, *stack_crawl_mark));
     return vm::Reflection::get_assembly_reflection_object(loaded_ass);
 }
 

@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "utils/string_builder.h"
+#include "utils/string_util.h"
 
 namespace leanclr
 {
@@ -29,7 +30,7 @@ static ReportUnhandledExceptionFunc g_report_unhandled_exception_function = null
 
 static const metadata::RtAotModulesData* g_aot_modules_data = nullptr;
 
-static utils::StringBuilder g_debugger_log_buffer;
+static utils::Utf8StringBuilder g_debugger_log_buffer;
 
 static void default_debugger_log_function(int32_t level, const uint16_t* category, size_t category_len, const uint16_t* message, size_t message_len)
 {
@@ -49,7 +50,7 @@ static void default_debugger_log_function(int32_t level, const uint16_t* categor
     // g_debugger_log_buffer.sure_null_terminator_but_not_append();
 
     // Output to standard output (could be replaced with other logging mechanisms)
-    printf("%s\n", g_debugger_log_buffer.as_cstr());
+    printf("%s\n", g_debugger_log_buffer.get_const_chars());
 }
 
 const char* Settings::get_domain_name()
@@ -176,12 +177,12 @@ void Settings::set_command_line_arguments_utf16(int32_t argc, const Utf16Char** 
 {
     assert(argv != nullptr);
     g_commandline_arguments_count = argc;
-    utils::StringBuilder sb;
+    utils::Utf8StringBuilder sb;
     for (int32_t i = 0; i < argc; ++i)
     {
         sb.clear();
         sb.append_utf16_str(argv[i], static_cast<size_t>(utils::StringUtil::get_utf16chars_length(argv[i])));
-        g_commandline_arguments[i] = sb.dup_to_zero_end_cstr();
+        g_commandline_arguments[i] = sb.dup_zero_terminated_chars();
     }
 }
 

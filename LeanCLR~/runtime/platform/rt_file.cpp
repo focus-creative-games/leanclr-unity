@@ -189,12 +189,7 @@ intptr_t File::open(const Utf16Char* filename, int32_t mode, int32_t access, int
     return reinterpret_cast<intptr_t>(h);
 #else
     // Convert UTF-16 filename to UTF-8 for the POSIX open() syscall.
-    int32_t u16_len = 0;
-    while (filename[u16_len] != 0)
-        ++u16_len;
-    utils::StringBuilder sb;
-    utils::StringUtil::utf16_to_utf8(filename, static_cast<size_t>(u16_len), sb);
-    sb.sure_null_terminator_but_not_append();
+    utils::Utf8StringBuilder sb(filename, static_cast<size_t>(utils::StringUtil::get_utf16chars_length(filename)));
 
     int flags = 0;
     switch (access)
@@ -240,7 +235,7 @@ intptr_t File::open(const Utf16Char* filename, int32_t mode, int32_t access, int
     (void)share;
     (void)options;
 
-    int fd = ::open(sb.as_cstr(), flags, 0644);
+    int fd = ::open(sb.get_const_chars(), flags, 0644);
     if (fd < 0)
     {
         set_error(error, errno_to_monoio(errno));
