@@ -92,12 +92,12 @@ namespace LeanCLR.BuildProcessors
                 }
             }
 
-            AppendLazyLoadAssemblyExcludeArgs(sb, aot.lazyLoadAssemblyNames);
+            AppendLazyLoadAssemblyExcludeArgs(sb, aot.lazyLoadAssemblyNames, aot.externalLazyLoadAssembliyDirs);
 
             return sb.ToString();
         }
 
-        private static void AppendLazyLoadAssemblyExcludeArgs(StringBuilder sb, string[] lazyLoadAssemblyNames)
+        private static void AppendLazyLoadAssemblyExcludeArgs(StringBuilder sb, string[] lazyLoadAssemblyNames, string[] externalLazyLoadAssembliyDirs)
         {
             if (lazyLoadAssemblyNames == null)
             {
@@ -129,6 +129,24 @@ namespace LeanCLR.BuildProcessors
 
                 sb.Append("--leanaot-exclude-assembly-from-global-metadata=");
                 sb.Append(name);
+            }
+
+            if (externalLazyLoadAssembliyDirs != null)
+            {
+                foreach (string dir in externalLazyLoadAssembliyDirs)
+                {
+                    foreach (var name in lazyLoadAssemblyNames)
+                    {
+                        var path = string.Format("{0}/{1}.dll", dir, name);
+
+                        if (File.Exists(path))
+                        {
+                            sb.Append(' ');
+                            sb.Append("--assembly=");
+                            sb.Append(path);
+                        }
+                    }
+                }
             }
         }
 

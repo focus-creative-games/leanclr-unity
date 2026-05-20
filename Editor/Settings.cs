@@ -38,6 +38,9 @@ namespace LeanCLR
 
         [Tooltip("Assemblies excluded from global-metadata.dat; load manually at runtime (e.g. Assembly.Load). They still participate in AOT compilation.")]
         public string[] lazyLoadAssemblyNames;
+
+        [Tooltip("searching paths of external lazy-loaded assemblies")]
+        public string[] externalLazyLoadAssembliyDirs;
     }
 
     public class Settings : ScriptableObject
