@@ -42,10 +42,10 @@ namespace LeanCLR
 
     public enum GCMode
     {
-        [Tooltip("Zero GC")]
-        Zero = 0,
         [Tooltip("MarkSweep GC")]
-        MarkSweep = 1,
+        MarkSweep = 0,
+        [Tooltip("Zero GC")]
+        Zero = 1,
     }
 
     public class Settings : ScriptableObject
@@ -54,7 +54,7 @@ namespace LeanCLR
         public bool enable = true;
 
         [Tooltip("GC Mode")]
-        public GCMode gcMode = GCMode.Zero;
+        public GCMode gcMode = GCMode.MarkSweep;
 
         [Tooltip("LeanAOT Settings")]
         public LeanAOTSettings leanAOTSettings;
