@@ -62,6 +62,16 @@ LeanCLR 是一个面向全平台的精练的 CLR（Common Language Runtime）实
 
 无需任何操作，本插件会自动在发布时使用leanclr替换il2cpp。
 
+### Lazy Loaed Assembly 的限制
+
+:::tip
+以下限制都只是暂时的，我们将很快会解决这些问题。
+
+:::
+
+- **不要**在场景、Prefab、AB 等资源上挂载 lazy 程序集里的脚本，否则会出现 Missing Script。原理见 [HybridCLR — MonoBehaviour 支持](https://www.hybridclr.cn/docs/basic/monobehaviour)。
+- 如果Lazy Loaded也有部分代码被编译到aot（即没有在aot.xml中对该程序集禁用aot），则要求加载Lazy Loaded程序集必须跟构建过程中的生成的裁剪后的aot dll完全一致。因此并不能直接使用 Compile Dll生成的程序集，必须使用打包时生成的裁剪后的aot dll。如果你有hybridclr使用经验，可以理解为lazy loaded程序集必须来自打包过程中生成的AssemblyPostStripped目录下的dll。目前leanclr4unity并没有主动复制构建过程中生成的aot dll，因此需要手动从 `Library/Bee/artifacts` 目录下查找并复制。
+
 ## 相关仓库
 
 | 仓库 | 说明 |

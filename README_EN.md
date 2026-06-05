@@ -61,6 +61,16 @@ Options for **Lean AOT (leanaot)** during packaging. If you leave the nested obj
 
 No manual action is required. During release builds, this plugin automatically uses LeanCLR to replace IL2CPP.
 
+### Lazy Loaded Assembly Limitations
+
+:::tip
+The following limitations are temporary; we expect to resolve them soon.
+
+:::
+
+- **Do not** attach scripts from lazy-load assemblies to scenes, prefabs, asset bundles, or other assets; otherwise you will get Missing Script errors. For the underlying reason, see [HybridCLR — MonoBehaviour support](https://www.hybridclr.cn/docs/basic/monobehaviour).
+- If a lazy-loaded assembly also has some code compiled into AOT (i.e., AOT is not fully disabled for that assembly in aot.xml), loading the lazy-loaded assembly at runtime requires it to match the **trimmed AOT DLL produced during the build** exactly. You cannot use assemblies from Compile Dll directly; you must use the trimmed AOT DLL from the build output. If you have HybridCLR experience, this is analogous to using DLLs from the `AssemblyPostStripped` directory produced during packaging. leanclr4unity does not currently copy these AOT DLLs for you automatically; you need to find and copy them manually from `Library/Bee/artifacts`.
+
 ## Related repositories
 
 | Repository | Description |
