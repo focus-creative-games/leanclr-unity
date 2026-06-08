@@ -67,11 +67,6 @@ class GarbageCollector
         return GcHeapImpl::get_collection_count();
     }
 
-    static bool is_object_marked(const vm::RtObject* obj)
-    {
-        return GcHeapImpl::is_object_marked(obj);
-    }
-
     static void set_pressure_config(const GcPressureConfig& config)
     {
         GcHeapImpl::set_pressure_config(config);
@@ -85,16 +80,6 @@ class GarbageCollector
     static bool has_strict_wbarriers()
     {
         return GcHeapImpl::has_strict_wbarriers();
-    }
-
-    static void* allocate_fixed(size_t size)
-    {
-        return GcHeapImpl::allocate_fixed(size);
-    }
-
-    static void free_fixed(void* address)
-    {
-        GcHeapImpl::free_fixed(address);
     }
 
     static vm::RtObject* allocate_object(const metadata::RtClass* klass, size_t size)

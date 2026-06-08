@@ -24,7 +24,6 @@ class ZeroGcHeap
     static int64_t get_used_size();
     static int64_t get_heap_size();
     static int32_t get_collection_count();
-    static bool is_object_marked(const vm::RtObject* obj);
 
     static void set_pressure_config(const GcPressureConfig& config);
 
@@ -37,9 +36,6 @@ class ZeroGcHeap
     {
         return false;
     }
-
-    static void* allocate_fixed(size_t size);
-    static void free_fixed(void* address);
 
     static vm::RtObject* allocate_object(const metadata::RtClass* klass, size_t size, const GcAllocSite& site);
     // static vm::RtObject* allocate_object_not_contains_references(const metadata::RtClass* klass, size_t size, const GcAllocSite& site);

@@ -202,7 +202,7 @@ namespace leanclr
             return Class::is_string_class(klass) || Class::is_blittable(klass);
         }
 
-        void GCHandle::foreach_strong_handles(void (*callback)(void*, void*), void* userData)
+        void GCHandle::foreach_strong_handles(void (*callback)(vm::RtObject*, void*), void* userData)
         {
             for (auto it = s_handle_map.begin(); it != s_handle_map.end(); ++it)
             {
@@ -214,6 +214,22 @@ namespace leanclr
                 if (hi->obj != nullptr)
                 {
                     callback(hi->obj, userData);
+                }
+            }
+        }
+
+        void GCHandle::sweep_weak_handles(bool (*is_object_marked)(vm::RtObject*, void* ctx), void* ctx)
+        {
+            for (auto it = s_handle_map.begin(); it != s_handle_map.end(); ++it)
+            {
+                HandleInfo* hi = it->second;
+                if (hi->type_ != GCHandleType::Weak && hi->type_ != GCHandleType::WeakTrackResurrection)
+                {
+                    continue;
+                }
+                if (hi->obj != nullptr && !is_object_marked(hi->obj, ctx))
+                {
+                    hi->obj = nullptr;
                 }
             }
         }

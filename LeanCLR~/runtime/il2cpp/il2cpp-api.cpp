@@ -1001,12 +1001,13 @@ void il2cpp_start_gc_world()
 
 void* il2cpp_gc_alloc_fixed(size_t size)
 {
-    return vm::GC::alloc_fixed(size);
+    printf("il2cpp_gc_alloc_fixed is not supported\n");
+    return nullptr;
 }
 
 void il2cpp_gc_free_fixed(void* address)
 {
-    vm::GC::free_fixed(address);
+    printf("il2cpp_gc_free_fixed is not supported\n");
 }
 
 // -- gchandle -------------------------------------------------------------
@@ -1061,7 +1062,7 @@ void il2cpp_gchandle_free(Il2CppGCHandle gchandle)
 
 void il2cpp_gchandle_foreach_get_target(void (*func)(void*, void*), void* userData)
 {
-    vm::GCHandle::foreach_strong_handles(func, userData);
+    vm::GCHandle::foreach_strong_handles((void (*)(vm::RtObject*, void*))func, userData);
 }
 
 void il2cpp_gc_wbarrier_set_field(Il2CppObject* obj, void** targetAddress, void* object)
