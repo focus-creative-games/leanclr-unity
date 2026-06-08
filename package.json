@@ -1,6 +1,6 @@
 {
   "name": "com.code-philosophy.leanclr",
-  "version": "0.1.0-alpha.4",
+  "version": "1.0.0-beta.1",
   "displayName": "LeanCLR",
   "description": "Unity plugin that replaces IL2CPP with LeanCLR when building for WebGL and mini-games, delivering smaller package size and lower memory footprint.",
   "category": "Scripting",
