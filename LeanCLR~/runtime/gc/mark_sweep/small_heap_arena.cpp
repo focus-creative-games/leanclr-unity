@@ -2,6 +2,8 @@
 
 #if LEANCLR_GC_MARK_SWEEP
 
+#include "utils/mem_op.h"
+
 namespace leanclr
 {
 namespace gc
@@ -22,11 +24,6 @@ static bool is_zeroed(void* block, size_t size)
 }
 #endif
 
-size_t SmallHeapArena::use_bits_word_count(size_t block_count)
-{
-    return (block_count + kBitsPerUseWord - 1) / kBitsPerUseWord;
-}
-
 bool SmallHeapArena::is_block_in_use(size_t index) const
 {
     return (_use_bits[index / kBitsPerUseWord] >> (index % kBitsPerUseWord)) & 1;
@@ -37,19 +34,34 @@ bool SmallHeapArena::is_block_free(size_t index) const
     return !is_block_in_use(index);
 }
 
-void SmallHeapArena::set_block_in_use(size_t index, bool in_use)
+void SmallHeapArena::set_block_in_use(size_t index)
 {
-    size_t word_index = index / kBitsPerUseWord;
-    size_t bit_index = index % kBitsPerUseWord;
-    size_t mask = static_cast<size_t>(1) << bit_index;
-    if (in_use)
+    const size_t word_index = index / kBitsPerUseWord;
+    const size_t bit_index = index % kBitsPerUseWord;
+    const size_t mask = static_cast<size_t>(1) << bit_index;
+    assert(word_index < kMaxUseChunkCount);
+    const bool word_was_empty = _use_bits[word_index] == 0;
+    _use_bits[word_index] |= mask;
+    _chunk_in_use_mask |= static_cast<uint64_t>(1) << word_index;
+}
+
+void SmallHeapArena::clear_block_in_use(size_t index)
+{
+    const size_t word_index = index / kBitsPerUseWord;
+    const size_t bit_index = index % kBitsPerUseWord;
+    const size_t mask = static_cast<size_t>(1) << bit_index;
+    assert(word_index < kMaxUseChunkCount);
+    _use_bits[word_index] &= ~mask;
+    if (_use_bits[word_index] == 0)
     {
-        _use_bits[word_index] |= mask;
+        _chunk_in_use_mask &= ~(static_cast<uint64_t>(1) << word_index);
     }
-    else
-    {
-        _use_bits[word_index] &= ~mask;
-    }
+}
+
+void SmallHeapArena::prepend_to_free_list(FreeBlockHeader* block)
+{
+    block->next_free = _free_list;
+    _free_list = block;
 }
 
 void* SmallHeapArena::block_at(size_t index) const
@@ -87,23 +99,18 @@ void SmallHeapArena::release_data()
     _data = nullptr;
     _block_count = 0;
     _free_list = nullptr;
-}
-
-size_t SmallHeapArena::allocation_size(size_t arena_size, size_t block_size)
-{
-    size_t block_count = arena_size / block_size;
-    return offsetof(SmallHeapArena, _use_bits) + use_bits_word_count(block_count) * sizeof(size_t);
+    _chunk_in_use_mask = 0;
 }
 
 SmallHeapArena::SmallHeapArena(void* arena_data, size_t arena_size, size_t block_size)
-    : _data(arena_data), _free_list(nullptr), _block_size(block_size), _block_count(arena_size / block_size)
+    : _data(arena_data), _free_list(nullptr), _block_size(block_size), _block_count(arena_size / block_size), _use_bits{}, _chunk_in_use_mask(0)
 {
     assert(arena_data != nullptr);
     assert(arena_size > 0);
     assert(block_size >= sizeof(FreeBlockHeader));
     assert(block_size >= sizeof(void*));
     assert(_block_count > 0);
-    std::memset(_use_bits, 0, use_bits_word_count(_block_count) * sizeof(size_t));
+    assert(_block_count <= kMaxBlockCount);
     rebuild_free_list();
 }
 
@@ -124,7 +131,7 @@ void* SmallHeapArena::allocate_block()
 #if LEANCLR_GC_DEBUG
     LEANCLR_GC_ASSERT(is_zeroed(free_block, _block_size), "free_block is not zeroed");
 #endif
-    set_block_in_use(slot_index(free_block), true);
+    set_block_in_use(slot_index(free_block));
     return free_block;
 }
 
@@ -135,15 +142,7 @@ bool SmallHeapArena::is_full()
 
 bool SmallHeapArena::is_empty() const
 {
-    const size_t word_count = use_bits_word_count(_block_count);
-    for (size_t i = 0; i < word_count; ++i)
-    {
-        if (_use_bits[i] != 0)
-        {
-            return false;
-        }
-    }
-    return true;
+    return _chunk_in_use_mask == 0;
 }
 
 size_t SmallHeapArena::get_block_size() const
@@ -154,43 +153,58 @@ size_t SmallHeapArena::get_block_size() const
 size_t SmallHeapArena::sweep(const GCAliveObjectBitmap& alive_object_bitmap)
 {
     size_t freed_count = 0;
+    uint64_t chunk_mask = _chunk_in_use_mask;
 
-    for (size_t i = 0; i < _block_count; i++)
+    while (chunk_mask != 0)
     {
-        if (is_block_free(i))
-        {
-            continue;
-        }
+        const size_t w = utils::MemOp::count_trailing_zeros_nonzero64(chunk_mask);
+        assert(w < kMaxUseChunkCount);
 
-        vm::RtObject* obj = reinterpret_cast<vm::RtObject*>(block_at(i));
-#if LEANCLR_GC_DEBUG
-        if (gc_debug_is_quarantined_tombstone(obj))
+        size_t word = _use_bits[w];
+        while (word != 0)
         {
-            continue;
-        }
+            const size_t bit_in_word = utils::MemOp::count_trailing_zeros_nonzero(word);
+            const size_t i = w * kBitsPerUseWord + bit_in_word;
+            if (i >= _block_count)
+            {
+                break;
+            }
+
+            vm::RtObject* obj = reinterpret_cast<vm::RtObject*>(block_at(i));
+#if LEANCLR_GC_DEBUG
+            if (gc_debug_is_quarantined_tombstone(obj))
+            {
+                word &= word - 1;
+                continue;
+            }
 #endif
-        if (alive_object_bitmap.is_marked(obj))
-        {
-            continue;
-        }
+            if (alive_object_bitmap.is_marked(obj))
+            {
+                word &= word - 1;
+                continue;
+            }
 
-        LEANCLR_ASSUME((uintptr_t)obj % GC_ALIGN == 0);
-        LEANCLR_ASSUME(_block_size % GC_ALIGN == 0);
+            LEANCLR_ASSUME((uintptr_t)obj % GC_ALIGN == 0);
+            LEANCLR_ASSUME(_block_size % GC_ALIGN == 0);
 #if LEANCLR_GC_DEBUG
-        gc_debug_quarantine_object(obj, _block_size);
+            gc_debug_quarantine_object(obj, _block_size);
 #else
-        std::memset(obj, 0, _block_size);
-        set_block_in_use(i, false);
+            std::memset(obj, 0, _block_size);
+            clear_block_in_use(i);
+            prepend_to_free_list(reinterpret_cast<FreeBlockHeader*>(obj));
 #endif
-        freed_count++;
+            freed_count++;
+            word &= word - 1;
+        }
+
+        chunk_mask &= chunk_mask - 1;
     }
 
-    rebuild_free_list();
     return freed_count;
 }
 
 SizeClassPool::SizeClassPool(size_t arena_size, size_t block_size, size_t block_alignment)
-    : _arena_size(arena_size), _block_size(block_size), _block_alignment(block_alignment), _current_arena(nullptr)
+    : _arena_size(arena_size), _block_size(block_size), _block_alignment(block_alignment), _current_arena(nullptr), _next_find_not_full_start(0)
 {
 }
 
@@ -204,8 +218,7 @@ SmallHeapArena* SizeClassPool::allocate_arena()
     }
     std::memset(arena_data, 0, _arena_size);
 
-    size_t mem_size = SmallHeapArena::allocation_size(_arena_size, _block_size);
-    void* mem = alloc::GeneralAllocation::malloc(mem_size);
+    void* mem = alloc::GeneralAllocation::malloc(sizeof(SmallHeapArena));
     if (mem == nullptr)
     {
         alloc::GeneralAllocation::aligned_free(arena_data);
@@ -230,69 +243,60 @@ void* SizeClassPool::allocate_block()
         {
             return block;
         }
-        _full_arenas.push_back(_current_arena);
         _current_arena = nullptr;
     }
-    if (!_not_full_arenas.empty())
+
+    _current_arena = find_next_not_full_arena();
+    if (LEANCLR_LIKELY(_current_arena != nullptr))
     {
-        _current_arena = _not_full_arenas.back();
-        _not_full_arenas.pop_back();
+        return _current_arena->allocate_block();
     }
-    else
+
+    _current_arena = allocate_arena();
+    if (_current_arena == nullptr)
     {
-        SmallHeapArena* new_arena = allocate_arena();
-        if (new_arena == nullptr)
-        {
-            return nullptr;
-        }
-        _current_arena = new_arena;
+        return nullptr;
     }
+    _arenas.push_back(_current_arena);
+    _next_find_not_full_start = _arenas.size();
     return _current_arena->allocate_block();
+}
+
+SmallHeapArena* SizeClassPool::find_next_not_full_arena()
+{
+    for (size_t i = _next_find_not_full_start; i < _arenas.size(); ++i)
+    {
+        if (!_arenas[i]->is_full())
+        {
+            _next_find_not_full_start = i + 1;
+            return _arenas[i];
+        }
+    }
+    _next_find_not_full_start = _arenas.size();
+    return nullptr;
 }
 
 void SizeClassPool::sweep(const GCAliveObjectBitmap& alive_object_bitmap, int64_t& freed_bytes)
 {
-    utils::Vector<SmallHeapArena*> all_arenas;
-    if (_current_arena != nullptr)
+    for (size_t i = 0; i < _arenas.size();)
     {
-        all_arenas.push_back(_current_arena);
-    }
-    for (size_t i = 0; i < _not_full_arenas.size(); ++i)
-    {
-        all_arenas.push_back(_not_full_arenas[i]);
-    }
-    for (size_t i = 0; i < _full_arenas.size(); ++i)
-    {
-        all_arenas.push_back(_full_arenas[i]);
-    }
-
-    _not_full_arenas.clear();
-    _full_arenas.clear();
-    _current_arena = nullptr;
-
-    for (size_t i = 0; i < all_arenas.size(); ++i)
-    {
-        SmallHeapArena* arena = all_arenas[i];
+        SmallHeapArena* arena = _arenas[i];
         size_t freed_count = arena->sweep(alive_object_bitmap);
         freed_bytes += static_cast<int64_t>(freed_count * arena->get_block_size());
+
         if (arena->is_empty())
         {
             free_arena(arena);
+            _arenas[i] = _arenas[_arenas.size() - 1];
+            _arenas.pop_back();
             continue;
         }
-        if (arena->is_full())
-        {
-            _full_arenas.push_back(arena);
-        }
-        else if (_current_arena == nullptr)
-        {
-            _current_arena = arena;
-        }
-        else
-        {
-            _not_full_arenas.push_back(arena);
-        }
+
+        ++i;
     }
+
+    _next_find_not_full_start = 0;
+    _current_arena = find_next_not_full_arena();
 }
 
 } // namespace gc
