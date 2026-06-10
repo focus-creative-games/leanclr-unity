@@ -21,6 +21,7 @@
 using System;
 using System.IO;
 using System.Text;
+using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -49,18 +50,19 @@ namespace LeanCLR.BuildProcessors
             Environment.SetEnvironmentVariable("UNITY_IL2CPP_PATH", runtimeDir);
             Debug.Log($"[SetupIl2CppEnv] set UNITY_IL2CPP_PATH='{runtimeDir}'");
 
-            string leanAotExtraArgs = BuildLeanAotExtraArgs();
+            string leanAotExtraArgs = BuildLeanAotExtraArgs(report.summary.platform);
             Environment.SetEnvironmentVariable("LEANAOT_EXTRA_ARGS", leanAotExtraArgs);
             Debug.Log($"[SetupIl2CppEnv] set LEANAOT_EXTRA_ARGS='{leanAotExtraArgs}'");
         }
 
-        private static string BuildLeanAotExtraArgs()
+        private static string BuildLeanAotExtraArgs(BuildTarget target)
         {
             LeanAOTSettings aot = Settings.Instance.leanAOTSettings;
             if (aot == null)
             {
                 aot = new LeanAOTSettings();
             }
+            
 
             var sb = new StringBuilder();
             sb.Append(" --leanaot-unity-version=");
@@ -70,6 +72,7 @@ namespace LeanCLR.BuildProcessors
             {
                 sb.Append(" --leanaot-enable-layout-validation");
             }
+            sb.Append($" --leanaot-managed-stripped-duplicate-path=\"{Settings.GetManagedStrippedDuplicatePath(target)}\"");
 
             if (aot.ruleFiles != null)
             {
