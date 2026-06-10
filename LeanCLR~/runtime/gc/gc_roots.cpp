@@ -1,10 +1,12 @@
 #include "gc/gc_roots.h"
 
+#include <cassert>
+
 #include "utils/rt_vector.h"
 #include "vm/class.h"
 #include "vm/field.h"
 #include "vm/gchandle.h"
-#include "obj_scan_util.h"
+#include "gc/obj_scanner.h"
 
 namespace leanclr
 {
@@ -37,33 +39,32 @@ void GcRoots::register_visit_object_roots(GcVisitObjectRootsScan scan)
     s_visit_object_roots.push_back(scan);
 }
 
-static void visit_object_roots(GcVisitObjectRoot visit, void* userdata)
-{
-    for (size_t i = 0; i < s_visit_object_roots.size(); ++i)
-    {
-        s_visit_object_roots[i](visit, userdata);
-    }
-}
-
-struct GcVisitContext
+struct GcMarkContext
 {
     GCAliveObjectBitmap& alive_object_bitmap;
-};
+    ObjScanner scanner;
 
-static bool is_first_visit(vm::RtObject* obj, void* userdata)
-{
-    GcVisitContext* ctx = reinterpret_cast<GcVisitContext*>(userdata);
-    return ctx->alive_object_bitmap.mark(obj);
-}
+    static bool visit(vm::RtObject* obj, void* userdata)
+    {
+        auto* ctx = static_cast<GcMarkContext*>(userdata);
+        return ctx->alive_object_bitmap.mark(obj);
+    }
+
+    explicit GcMarkContext(GCAliveObjectBitmap& alive_object_bitmap)
+        : alive_object_bitmap(alive_object_bitmap), scanner(visit, this)
+    {
+    }
+};
 
 static void on_visit_object(vm::RtObject* obj, void* userdata)
 {
-    ObjScanUtil::visit_object(obj, is_first_visit, userdata);
+    auto* ctx = static_cast<GcMarkContext*>(userdata);
+    ctx->scanner.visit_object(obj);
 }
 
 void GcRoots::foreach_root(GCAliveObjectBitmap& alive_object_bitmap)
 {
-    GcVisitContext ctx = { alive_object_bitmap };
+    GcMarkContext ctx(alive_object_bitmap);
     for (GcVisitObjectRootsScan visit : s_visit_object_roots)
     {
         visit(on_visit_object, &ctx);
@@ -77,7 +78,8 @@ void GcRoots::foreach_root(GCAliveObjectBitmap& alive_object_bitmap)
         }
     }
     vm::GCHandle::foreach_strong_handles(on_visit_object, &ctx);
-    ObjScanUtil::visit_all_classes_static_data(is_first_visit, &ctx);
+    ctx.scanner.visit_all_classes_static_data();
+    ctx.scanner.finish_visit();
 }
 
 } // namespace gc
