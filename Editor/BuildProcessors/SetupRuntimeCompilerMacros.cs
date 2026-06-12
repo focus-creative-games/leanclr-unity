@@ -170,7 +170,7 @@ namespace LeanCLR.BuildProcessors
                 sb.Append(" -DLEANCLR_GC_DEBUG=1");
             }
 
-            if (lazyLoadedAssemblyNames != null)
+            if (lazyLoadedAssemblyNames != null && lazyLoadedAssemblyNames.Length > 0)
             {
                 sb.Append(" -DLEANCLR_PLACEHOLDER_ASSEMBLY_NAMES=").Append(string.Join(",", lazyLoadedAssemblyNames));
             }
