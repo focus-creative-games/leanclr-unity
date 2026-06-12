@@ -58,11 +58,7 @@ namespace LeanCLR.BuildProcessors
         private static string BuildLeanAotExtraArgs(BuildTarget target)
         {
             LeanAOTSettings aot = Settings.Instance.leanAOTSettings;
-            if (aot == null)
-            {
-                aot = new LeanAOTSettings();
-            }
-            
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
             var sb = new StringBuilder();
             sb.Append(" --leanaot-unity-version=");
@@ -74,78 +70,77 @@ namespace LeanCLR.BuildProcessors
             }
             sb.Append($" --leanaot-managed-stripped-duplicate-path=\"{Settings.GetManagedStrippedDuplicatePath(target)}\"");
 
-            if (aot.ruleFiles != null)
+            AppendExistingFileArguments(sb, aot.ruleFiles, projectRoot, "--leanaot-aot-rule-file", "AOT rule file");
+            AppendExistingFileArguments(sb, aot.pgoRuleFiles, projectRoot, "--leanaot-pgo-rule-file", "PGO rule file");
+
+            if (aot.lazyLoadedAssemblyNames != null)
             {
-                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-                foreach (string raw in aot.ruleFiles)
+                foreach (string raw in aot.lazyLoadedAssemblyNames)
                 {
                     if (string.IsNullOrWhiteSpace(raw))
                     {
                         continue;
                     }
 
-                    string trimmed = raw.Trim();
-                    string fullPath = Path.IsPathRooted(trimmed)
-                        ? Path.GetFullPath(trimmed)
-                        : Path.GetFullPath(Path.Combine(projectRoot, trimmed));
-                    if (!File.Exists(fullPath))
-                    {
-                        throw new Exception(
-                            $"LeanCLR: AOT rule file not found. Configured path: '{raw}', resolved to: '{fullPath}'.");
-                    }
-
-                    AppendRuleFileArgument(sb, fullPath);
+                    AppendArgument(sb, "--leanaot-exclude-assembly-from-global-metadata=" + raw.Trim());
                 }
             }
-
-            AppendLazyLoadAssemblyExcludeArgs(sb, aot.lazyLoadedAssemblyNames);
 
             return sb.ToString();
         }
 
-        private static void AppendLazyLoadAssemblyExcludeArgs(StringBuilder sb, string[] lazyLoadAssemblyNames)
+        private static void AppendExistingFileArguments(
+            StringBuilder sb,
+            string[] paths,
+            string projectRoot,
+            string argument,
+            string configLabel)
         {
-            if (lazyLoadAssemblyNames == null)
+            if (paths == null)
             {
                 return;
             }
 
-            foreach (string raw in lazyLoadAssemblyNames)
+            foreach (string raw in paths)
             {
                 if (string.IsNullOrWhiteSpace(raw))
                 {
                     continue;
                 }
 
-                string name = raw.Trim();
-                if (name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                string fullPath = ResolveProjectFilePath(raw, projectRoot);
+                if (!File.Exists(fullPath))
                 {
-                    name = name.Substring(0, name.Length - 4);
+                    throw new Exception(
+                        $"LeanCLR: {configLabel} not found. Configured path: '{raw}', resolved to: '{fullPath}'.");
                 }
 
-                if (string.IsNullOrEmpty(name))
-                {
-                    continue;
-                }
-
-                if (sb.Length > 0)
-                {
-                    sb.Append(' ');
-                }
-
-                sb.Append("--leanaot-exclude-assembly-from-global-metadata=");
-                sb.Append(name);
+                AppendQuotedFileArgument(sb, argument, fullPath);
             }
         }
 
-        private static void AppendRuleFileArgument(StringBuilder sb, string absolutePath)
+        private static string ResolveProjectFilePath(string raw, string projectRoot)
+        {
+            string trimmed = raw.Trim();
+            return Path.IsPathRooted(trimmed)
+                ? Path.GetFullPath(trimmed)
+                : Path.GetFullPath(Path.Combine(projectRoot, trimmed));
+        }
+
+        private static void AppendArgument(StringBuilder sb, string argument)
         {
             if (sb.Length > 0)
             {
                 sb.Append(' ');
             }
 
-            sb.Append("--leanaot-aot-rule-file ");
+            sb.Append(argument);
+        }
+
+        private static void AppendQuotedFileArgument(StringBuilder sb, string argument, string absolutePath)
+        {
+            AppendArgument(sb, argument);
+            sb.Append(' ');
             sb.Append('"');
             sb.Append(absolutePath.Replace("\"", "\\\""));
             sb.Append('"');

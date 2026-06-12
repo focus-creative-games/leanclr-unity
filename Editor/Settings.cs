@@ -36,6 +36,9 @@ namespace LeanCLR
         [Tooltip("Paths to AOT rule files for Lean AOT (project-root-relative or absolute). Missing files fail the build. See Docs~/aot-rule-file.md in this package.")]
         public string[] ruleFiles;
 
+        [Tooltip("Paths to PGO rule files for Lean AOT (project-root-relative or absolute). Missing files fail the build. See Docs~/pgo-rule-file.md in this package.")]
+        public string[] pgoRuleFiles;
+
         [Tooltip("Assemblies excluded from global-metadata.dat; load manually at runtime (e.g. Assembly.Load). They still participate in AOT compilation.")]
         public string[] lazyLoadedAssemblyNames;
     }
