@@ -85,43 +85,16 @@ namespace LeanCLR.BuildProcessors
                 @"--compiler-flags=""([^""]*)""",
                 m =>
                 {
-                    string cleaned = StripLeanClrDefineTokens(m.Groups[1].Value);
-                    if (string.IsNullOrWhiteSpace(cleaned))
+                    string compilerFlags = m.Groups[1].Value;
+                    if (compilerFlags.Contains("-DUNITY_VERSION="))
                     {
                         return string.Empty;
                     }
 
-                    return $"--compiler-flags=\"{cleaned.Trim()}\"";
+                    return m.Groups[0].Value;
                 });
 
-            return CollapseDuplicateWhitespace(result);
-        }
-
-        static string StripLeanClrDefineTokens(string inner)
-        {
-            if (string.IsNullOrWhiteSpace(inner))
-            {
-                return string.Empty;
-            }
-
-            string s = inner;
-            s = Regex.Replace(s, @"-DUNITY_VERSION=\d+", " ");
-            s = Regex.Replace(s, @"-DUNITY_TUANJIE_ENGINE=\d+", " ");
-            s = Regex.Replace(s, @"-DLEANCLR_GC_ZERO_GC=\d+", " ");
-            s = Regex.Replace(s, @"-DLEANCLR_GC_MARK_SWEEP=\d+", " ");
-            s = Regex.Replace(s, @"-DLEANCLR_GC_DEBUG=\d+", " ");
-            s = Regex.Replace(s, @"-DLEANCLR_PLACEHOLDER_ASSEMBLY_NAMES=\S+", " ");
-            return s.Trim();
-        }
-
-        static string CollapseDuplicateWhitespace(string s)
-        {
-            if (string.IsNullOrEmpty(s))
-            {
-                return string.Empty;
-            }
-
-            return Regex.Replace(s.Trim(), @"\s{2,}", " ");
+            return result;
         }
 
         /// <summary>
@@ -157,7 +130,11 @@ namespace LeanCLR.BuildProcessors
 
             if (lazyLoadedAssemblyNames != null && lazyLoadedAssemblyNames.Length > 0)
             {
-                sb.Append(" -DLEANCLR_PLACEHOLDER_ASSEMBLY_NAMES=").Append(string.Join(",", lazyLoadedAssemblyNames.Select(x => x.Trim())));
+                string[] strippedNames = lazyLoadedAssemblyNames.Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+                if (strippedNames.Length > 0)
+                {
+                    sb.Append(" -DLEANCLR_PLACEHOLDER_ASSEMBLY_NAMES=").Append(string.Join("|", strippedNames));
+                }
             }
             
             return sb.ToString();
