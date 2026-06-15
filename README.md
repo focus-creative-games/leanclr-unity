@@ -56,6 +56,24 @@ LeanCLR 是一个面向全平台的精练的 CLR（Common Language Runtime）实
 - **`layoutValidation`**：是否开启类型布局等相关校验，便于在开发期尽早发现与原生布局不一致的问题；一般仅在需要排查或严格校验时开启。
 - **`ruleFiles`**：用于配置 **AOT 规则文件**路径列表（可多个）。规则文件的格式、节点与语义说明见包内文档 **[`Docs~/aot-rule-file.md`](./Docs~/aot-rule-file.md)**。每项路径可为相对 **Unity 工程根目录**（与 `Assets` 同级）的相对路径，或本机绝对路径；打包前会校验文件存在，不存在则构建失败。留空或不配置列表即不使用外部规则文件。
 - **`lazyLoadAssemblyNames`**：列表中的程序集在构建时**不会**写入 **global-metadata.dat**，运行时需你自行 **`Assembly.Load`** 等方式加载。这些程序集**仍会参与 AOT 编译**。
+- **`enablePgoProfile`**：启用 PGO profile 采集（构建时向 LeanAOT / 运行时注入统计桩）。用于采集热路径数据，详见下文 [Profile Guided AOT](#profile-guided-aot-pgo)。
+- **`pgoRuleFiles`**：PGO 规则文件（`pgo.xml`）路径列表，格式与 `ruleFiles`（`aot.xml`）**不同**；打包时传给 LeanAOT 的 `--leanaot-pgo-rule-file`。
+
+### Profile Guided AOT (PGO)
+
+**Profile Guided AOT** 根据运行时采集的调用统计，将热点方法写入 PGO 规则文件，在后续构建中**追加** AOT 编译（与 `aot.xml` 的包含/排除策略配合使用）。完整说明见 LeanCLR 文档 **[pgo2aot](https://github.com/focus-creative-games/leanclr/blob/support-unity/docs/pgo2aot.md)**。
+
+**使用步骤：**
+
+1. 在 **LeanCLR Settings** 的 **Lean AOT** 中启用 **`enablePgoProfile`**。
+2. **发布**带 profile 桩的版本后，在合适时机调用 **`LeanCLR.Profile.ExportGlobalStatsJson`**（或 `GetGlobalStatsJson` / `ExportPeriodStatsJson` 等）保存 PGO 数据（JSON）。可参考示例脚本 **`LeanClrPgoGui.cs`**（在 `persistentDataPath/LeanCLR-PGO/` 下按会话保存 `global-*.json`）。
+   - **WebGL** 等平台无法直接读写本地文件时，请调用 **`LeanCLR.Profile.GetGlobalStatsJson`** 取得 JSON 字符串，再通过 HTTP 上传到服务器；服务端可用自有工具或 Python 脚本落盘为 `.json` 文件。
+3. 使用 **`pgo2aot`** 将 profile JSON 转为 PGO 规则 XML（**注意：格式与 `aot.xml` 不同**）：
+   ```bat
+   dotnet pgo2aot.dll --input global.json --output pgo.xml --strategy pareto --pareto-ratio 0.8
+   ```
+   `pgo2aot` 随 LeanCLR 工具链发布（`LeanCLR~/pgo2aot/`），亦可用 `dotnet` 运行其中的 `pgo2aot.dll`。
+4. 将生成的 **`pgo.xml`** 放到 `Assets` 下合适位置，在 **LeanCLR Settings** 的 **`leanAOTSettings.pgoRuleFiles`** 中添加该路径（例如 `Assets/LeanCLR/pgo.xml`），然后关闭 **`enablePgoProfile`** 进行正式发包构建。
 
 ### 构建
 

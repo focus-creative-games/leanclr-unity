@@ -55,6 +55,24 @@ Options for **Lean AOT (leanaot)** during packaging. If you leave the nested obj
 - **`layoutValidation`**: Enables layout-related checks to catch inconsistencies with native layouts earlier; turn on mainly for diagnostics or stricter validation workflows.
 - **`ruleFiles`**: Configures the list of **AOT rule file** paths (multiple entries allowed). For rule file format, elements, and semantics, see **[`Docs~/aot-rule-file.md`](./Docs~/aot-rule-file.md)** in this package. Each path may be relative to the **Unity project root** (the folder that contains `Assets`) or an absolute path on disk. Missing files fail the build at preprocess time. Leave the list empty or unset to skip external rule files.
 - **`lazyLoadAssemblyNames`**: Assemblies in this list are **not** written into **global-metadata.dat** at build time; load them yourself at runtime (for example with **`Assembly.Load`**). They **still take part in AOT compilation**.
+- **`enablePgoProfile`**: Enables PGO profile instrumentation (injects profiling hooks into LeanAOT / the runtime at build time). Use this to collect hot-path data; see [Profile Guided AOT](#profile-guided-aot-pgo) below.
+- **`pgoRuleFiles`**: Paths to PGO rule files (`pgo.xml`). The format is **different** from `ruleFiles` (`aot.xml`). Passed to LeanAOT as `--leanaot-pgo-rule-file` during packaging.
+
+### Profile Guided AOT (PGO)
+
+**Profile Guided AOT** uses runtime call statistics to write hot methods into a PGO rule file, then **adds** those methods to AOT compilation in later builds (typically paired with include/exclude policy in `aot.xml`). For full details, see the LeanCLR guide **[pgo2aot](https://github.com/focus-creative-games/leanclr/blob/support-unity/docs/pgo2aot.md)**.
+
+**Workflow:**
+
+1. In **LeanCLR Settings** under **Lean AOT**, enable **`enablePgoProfile`**.
+2. **Publish** a build with profiling instrumentation, then call **`LeanCLR.Profile.ExportGlobalStatsJson`** (or `GetGlobalStatsJson` / `ExportPeriodStatsJson`, etc.) at the right time to save PGO data as JSON. See the sample script **`LeanClrPgoGui.cs`** (saves `global-*.json` per session under `persistentDataPath/LeanCLR-PGO/`).
+   - On **WebGL** and similar targets that cannot read/write local files directly, call **`LeanCLR.Profile.GetGlobalStatsJson`** to obtain the JSON string, upload it via HTTP to a server, and persist it as a `.json` file with your own server tool or a Python script.
+3. Run **`pgo2aot`** to convert profile JSON into a PGO rule XML file (**note: not the same format as `aot.xml`**):
+   ```bat
+   dotnet pgo2aot.dll --input global.json --output pgo.xml --strategy pareto --pareto-ratio 0.8
+   ```
+   `pgo2aot` ships with the LeanCLR toolchain (`LeanCLR~/pgo2aot/`); run `pgo2aot.dll` with `dotnet` as shown above.
+4. Place the generated **`pgo.xml`** under `Assets` (or another suitable location), add that path to **`leanAOTSettings.pgoRuleFiles`** in **LeanCLR Settings** (for example `Assets/LeanCLR/pgo.xml`), then turn **`enablePgoProfile`** off for your release build.
 
 ### Build
 
