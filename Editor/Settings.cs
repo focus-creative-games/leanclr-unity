@@ -36,7 +36,7 @@ namespace LeanCLR
         [Tooltip("Enable PGO profile instrumentation for LeanAOT/runtime integration.")]
         public bool enablePgoProfile;
 
-        [Tooltip("Paths to AOT rule files for Lean AOT (project-root-relative or absolute). Missing files fail the build. See Docs~/aot-rule-file.md in this package.")]
+        [Tooltip("Paths to AOT rule files for Lean AOT (project-root-relative or absolute). Missing files fail the build. See https://doc.leanclr.com/docs/aot/rule-file")]
         public string[] ruleFiles;
 
         [Tooltip("Paths to PGO rule files for Lean AOT (project-root-relative or absolute). Missing files fail the build. See Docs~/pgo-rule-file.md in this package.")]
@@ -64,6 +64,13 @@ namespace LeanCLR
         public bool enableGCDebug;
     }
 
+    [Serializable]
+    public class HotUpdateSettings
+    {
+        [Tooltip("Hot-update assemblies excluded from the player build; load them at runtime instead.")]
+        public string[] hotUpdateAssemblyNames;
+    }
+
     public class Settings : ScriptableObject
     {
         [Tooltip("Enable LeanCLR")]
@@ -71,6 +78,9 @@ namespace LeanCLR
 
         [Tooltip("LeanAOT Settings")]
         public LeanAOTSettings leanAOTSettings;
+
+        [Tooltip("Hot Update Settings")]
+        public HotUpdateSettings hotUpdateSettings;
 
         [Tooltip("GC Settings")]
         public GCSettings gcSettings;

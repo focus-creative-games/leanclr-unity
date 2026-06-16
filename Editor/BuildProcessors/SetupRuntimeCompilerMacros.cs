@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -65,8 +66,7 @@ namespace LeanCLR.BuildProcessors
             }
 
             var ver = installerController.CurVersion;
-            string[] lazyLoadedAssemblyNames = Settings.Instance.leanAOTSettings?.lazyLoadedAssemblyNames;
-            string inner = BuildCompilerDefineFlags(ver, lazyLoadedAssemblyNames);
+            string inner = BuildCompilerDefineFlags(ver);
             string block = $"--compiler-flags=\"{inner}\"";
             string merged = string.IsNullOrWhiteSpace(stripped) ? block : $"{stripped.Trim()} {block}";
             PlayerSettings.SetAdditionalIl2CppArgs(merged.Trim());
@@ -100,7 +100,7 @@ namespace LeanCLR.BuildProcessors
         /// <summary>
         /// IL2CPP additional args use Clang-style -D defines for all targets (Unity IL2CPP toolchain).
         /// </summary>
-        internal static string BuildCompilerDefineFlags(UnityVersion ver, string[] lazyLoadedAssemblyNames)
+        internal static string BuildCompilerDefineFlags(UnityVersion ver)
         {
             int packed = ver.major * 10000 + ver.minor1 * 100 + ver.minor2;
             var sb = new StringBuilder(64);
@@ -134,16 +134,36 @@ namespace LeanCLR.BuildProcessors
                 sb.Append(" -DLEANCLR_PGO_PROFILE=1");
             }
 
-            if (lazyLoadedAssemblyNames != null && lazyLoadedAssemblyNames.Length > 0)
+            string[] placeholderAssemblyNames = GetPlaceholderAssemblyNames();
+            if (placeholderAssemblyNames.Length > 0)
             {
-                string[] strippedNames = lazyLoadedAssemblyNames.Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
-                if (strippedNames.Length > 0)
+                sb.Append(" -DLEANCLR_PLACEHOLDER_ASSEMBLY_NAMES=").Append(string.Join("+", placeholderAssemblyNames));
+            }
+
+            return sb.ToString();
+        }
+
+        static string[] GetPlaceholderAssemblyNames()
+        {
+            List<string> lazyLoadedNames = BuildProcessorUtil.GetNormalizedAssemblyNames(
+                Settings.Instance.leanAOTSettings?.lazyLoadedAssemblyNames);
+            List<string> hotUpdateNames = BuildProcessorUtil.GetNormalizedAssemblyNames(
+                Settings.Instance.hotUpdateSettings?.hotUpdateAssemblyNames);
+
+            var lazyLoadedNameSet = new HashSet<string>(lazyLoadedNames, StringComparer.Ordinal);
+            foreach (string name in hotUpdateNames)
+            {
+                if (lazyLoadedNameSet.Contains(name))
                 {
-                    sb.Append(" -DLEANCLR_PLACEHOLDER_ASSEMBLY_NAMES=").Append(string.Join("|", strippedNames));
+                    throw new Exception(
+                        $"LeanCLR: assembly '{name}' is configured in both lazyLoadedAssemblyNames and hotUpdateAssemblyNames");
                 }
             }
-            
-            return sb.ToString();
+
+            var placeholderNames = new List<string>(lazyLoadedNames.Count + hotUpdateNames.Count);
+            placeholderNames.AddRange(lazyLoadedNames);
+            placeholderNames.AddRange(hotUpdateNames);
+            return placeholderNames.ToArray();
         }
     }
 }
